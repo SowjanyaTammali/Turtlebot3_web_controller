@@ -1,0 +1,1171 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>TurtleBot3 Advanced Controller</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 20px;
+            background-color: #f0f0f0;
+        }
+
+        .main-container {
+            display: flex;
+            justify-content: space-around;
+            flex-wrap: wrap;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .control-panel {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            margin: 10px;
+            min-width: 300px;
+        }
+
+        .movement-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 5px;
+            margin: 10px;
+        }
+
+        .speed-controls {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 5px;
+            margin: 10px;
+        }
+
+        .control-button {
+            width: 60px;
+            height: 60px;
+            font-size: 20px;
+            border: none;
+            border-radius: 8px;
+            background-color: #007bff;
+            color: white;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            position: relative;
+        }
+
+        .control-button:active {
+            background-color: #0056b3;
+        }
+
+        .control-button::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: -25px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 12px;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 3px 6px;
+            border-radius: 3px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            white-space: nowrap;
+            pointer-events: none;
+        }
+
+        .control-button:hover::after {
+            opacity: 1;
+        }
+
+        .speed-button {
+            width: 60px;
+            height: 40px;
+            font-size: 16px;
+            border: none;
+            border-radius: 5px;
+            background-color: #28a745;
+            color: white;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .speed-button:active {
+            background-color: #218838;
+        }
+
+        .map-container {
+            position: relative;
+            width: 800px;
+            height: 600px;
+            margin: 10px auto;
+            border: 1px solid #ccc;
+            background: #f5f5f5;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+
+        #mapCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: white;
+            cursor: crosshair;
+        }
+
+        .nav-controls {
+            position: relative;
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 10px;
+            padding: 10px;
+        }
+
+        .nav-button {
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.3s;
+        }
+
+        .nav-button:hover {
+            background-color: #0056b3;
+        }
+
+        .nav-button.active {
+            background-color: #28a745;
+        }
+
+        .status-panel {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px;
+            text-align: left;
+            font-family: monospace;
+            min-width: 300px;
+        }
+
+        .speeds {
+            margin: 10px;
+            padding: 10px;
+            background: #e9ecef;
+            border-radius: 5px;
+            font-family: monospace;
+        }
+
+        .connection-status {
+            padding: 10px;
+            margin: 10px;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+
+        .connected {
+            background-color: #d4edda;
+            color: #155724;
+        }
+
+        .disconnected {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+
+        .error-message {
+            background-color: #fff3cd;
+            color: #856404;
+            padding: 10px;
+            margin: 10px;
+            border-radius: 5px;
+            display: none;
+        }
+
+        .legend {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            text-align: left;
+            z-index: 1000;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin: 5px 0;
+        }
+
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            margin-right: 10px;
+            border: 1px solid #ccc;
+        }
+
+        .map-overlay {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            z-index: 1000;
+        }
+
+        .coordinates {
+            font-family: monospace;
+            margin-bottom: 5px;
+        }
+
+        .debug-overlay {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            z-index: 1000;
+            pointer-events: none;
+}
+    </style>
+</head>
+<body>
+    <h1>TurtleBot3 Advanced Controller</h1>
+    
+    <div class="connection-status disconnected" id="connectionStatus">
+        Disconnected
+    </div>
+    <div class="error-message" id="errorMessage"></div>
+
+    <div class="main-container">
+        <div class="control-panel">
+            <h3>Movement Controls</h3>
+            <p>Use keyboard or click buttons to control the robot</p>
+            <div class="movement-grid">
+                <button class="control-button" data-key="u" data-tooltip="Forward + Left">↖</button>
+                <button class="control-button" data-key="i" data-tooltip="Forward">↑</button>
+                <button class="control-button" data-key="o" data-tooltip="Forward + Right">↗</button>
+                <button class="control-button" data-key="j" data-tooltip="Rotate Left">↺</button>
+                <button class="control-button" data-key="k" data-tooltip="Stop">⬛</button>
+                <button class="control-button" data-key="l" data-tooltip="Rotate Right">↻</button>
+                <button class="control-button" data-key="m" data-tooltip="Back + Left">↙</button>
+                <button class="control-button" data-key="," data-tooltip="Back">↓</button>
+                <button class="control-button" data-key="." data-tooltip="Back + Right">↘</button>
+            </div>
+        </div>
+
+        <div class="control-panel">
+            <h3>Speed Controls</h3>
+            <div class="speed-controls">
+                <div>
+                    <button class="speed-button" data-key="q">↑ All</button>
+                    <button class="speed-button" data-key="z">↓ All</button>
+                    <div>Both Speeds</div>
+                </div>
+                <div>
+                    <button class="speed-button" data-key="w">↑ Lin</button>
+                    <button class="speed-button" data-key="x">↓ Lin</button>
+                    <div>Linear Speed</div>
+                </div>
+                <div>
+                    <button class="speed-button" data-key="e">↑ Ang</button>
+                    <button class="speed-button" data-key="c">↓ Ang</button>
+                    <div>Angular Speed</div>
+                </div>
+            </div>
+        </div>
+
+        <div id="debugOverlay" class="debug-overlay">
+            Map Data: Not received<br>
+            Mouse Position: N/A<br>
+            Robot Position: N/A
+        </div>
+
+        <div class="status-panel">
+            <h3>Robot Status</h3>
+            <div id="speeds" class="speeds">
+                Linear: 0.50 m/s<br>
+                Angular: 1.00 rad/s
+            </div>
+            <div id="currentMovement" class="speeds">
+                Current Movement: Stopped
+            </div>
+            <div id="robotPose" class="speeds">
+                Position: (0.00, 0.00)<br>
+                Orientation: 0.00°
+            </div>
+            <div id="navStatus" class="speeds">
+                Navigation Status: Idle
+            </div>
+        </div>
+
+        <div class="control-panel">
+            <h3>Navigation</h3>
+            <div class="map-container">
+                <canvas id="mapCanvas"></canvas>
+                <div class="map-overlay">
+                    <div class="coordinates" id="mouseCoordinates">X: 0.00 m, Y: 0.00 m</div>
+                    <div class="coordinates" id="robotCoordinates">Robot: (0.00, 0.00)</div>
+                </div>
+                <div class="legend">
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #ccc"></div>
+                        <span>Unknown Space</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: white"></div>
+                        <span>Free Space</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: black"></div>
+                        <span>Obstacle</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: rgba(255,0,0,0.5)"></div>
+                        <span>LIDAR Data</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: blue"></div>
+                        <span>Robot Position</span>
+                    </div>
+                </div>
+            </div>
+            <div class="nav-controls">
+                <button class="nav-button" id="setPoseBtn" title="Click and drag on map to set robot's position and orientation">2D Pose Estimate</button>
+                <button class="nav-button" id="setGoalBtn" title="Click and drag on map to set navigation goal position and orientation">Set Navigation Goal</button>
+                <button class="nav-button" id="cancelNavBtn" title="Cancel current navigation goal">Cancel Navigation</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let isSettingPose = false;
+        let isSettingGoal = false;
+        let startX = 0;
+        let startY = 0;
+        let isDragging = false;
+        let currentTheta = 0;
+        let robotPose = { x: 0, y: 0, theta: 0 };
+        let lastMapData = null;
+        let lastScanData = null;
+        let mapScale = { x: 1, y: 1 };
+        let mapOrigin = { x: 0, y: 0 };
+        let canvasInstance = null;
+        let reconnectAttempts = 0;
+        const MAX_RECONNECT_ATTEMPTS = 5;
+
+        function showError(message) {
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+            setTimeout(() => {
+                errorDiv.style.display = 'none';
+            }, 5000);
+        }
+
+        function connect() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                console.log('WebSocket is already connected');
+                return;
+    }
+
+            const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${wsProtocol}//${window.location.hostname}:${window.location.port}`;
+            console.log('Connecting to:', wsUrl);
+            
+            ws = new WebSocket(wsUrl);
+            
+            ws.onopen = () => {
+                console.log('WebSocket connected successfully');
+                document.getElementById('connectionStatus').textContent = 'Connected';
+                document.getElementById('connectionStatus').className = 'connection-status connected';
+                reconnectAttempts = 0;
+            };
+            
+            ws.onclose = () => {
+                console.log('WebSocket connection closed');
+                document.getElementById('connectionStatus').textContent = 'Disconnected';
+                document.getElementById('connectionStatus').className = 'connection-status disconnected';
+                
+                // Attempt to reconnect
+                if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+                    reconnectAttempts++;
+                    console.log(`Attempting to reconnect (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`);
+                    setTimeout(connect, 1000);
+                } else {
+                    console.error('Max reconnection attempts reached');
+                    alert('Connection lost. Please refresh the page.');
+                }
+            };
+
+            ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    console.log('Received message:', data.type);
+                    handleServerMessage(data);
+                } catch (error) {
+                    console.error('Error processing message:', error);
+                }
+            };
+
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+            };
+           
+        }
+
+        function sendWSMessage(message) {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                console.log('WebSocket not connected, attempting to reconnect...');
+                connect();
+                setTimeout(() => sendWSMessage(message), 1000);
+                return;
+            }
+            
+            try {
+                ws.send(JSON.stringify(message));
+            } catch (error) {
+                console.error('Error sending message:', error);
+                connect(); // Try to reconnect
+            }
+        }
+
+        function drawMapBoundaries(ctx) {
+            if (!lastMapData) return;
+
+            const mapWidth = lastMapData.width * lastMapData.resolution;
+            const mapHeight = lastMapData.height * lastMapData.resolution;
+            
+            ctx.strokeStyle = 'rgba(255, 0, 0, 0.5)';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(0, 0, canvasInstance.width, canvasInstance.height);
+            
+            // Draw coordinate axes
+            ctx.strokeStyle = 'blue';
+            ctx.beginPath();
+            ctx.moveTo(canvasInstance.width/2, canvasInstance.height/2);
+            ctx.lineTo(canvasInstance.width/2 + 50, canvasInstance.height/2);
+            ctx.stroke();
+            
+            ctx.strokeStyle = 'red';
+            ctx.beginPath();
+            ctx.moveTo(canvasInstance.width/2, canvasInstance.height/2);
+            ctx.lineTo(canvasInstance.width/2, canvasInstance.height/2 - 50);
+            ctx.stroke();
+}
+
+        function handleServerMessage(data) {
+            try {
+                switch(data.type) {
+                    case 'map_data':
+                    console.log('Received map data:', data.data);
+                    if (!data.data || !data.data.width || !data.data.height) {
+                        console.error('Invalid map data received');
+                        return;
+                    }
+                    lastMapData = {
+                        width: data.data.width,
+                        height: data.data.height,
+                        resolution: data.data.resolution,
+                        origin: data.data.origin || { x: -10, y: -10, z: 0 },
+                        data: data.data.data || []
+                    };
+                    
+                    // Initialize canvas when map data is received
+                    initializeCanvas();
+                    console.log('Map scale:', mapScale);
+                    updateMap();
+                    break;
+                                
+                    case 'status':
+                        updateSpeedDisplay(data.speeds);
+                        break;
+                    case 'speedUpdate':
+                        updateSpeedDisplay(data.speeds);
+                        break;
+                    case 'movement':
+                        updateMovementDisplay(data.velocities);
+                        break;
+                    case 'scan_data':
+                        lastScanData = data.data;
+                        updateMap();
+                        break;
+                    case 'robot_state':
+                        if (data.data && data.data.pose) {
+                            robotPose = data.data.pose;
+                            updateRobotPoseDisplay();
+                            updateMap();
+                        }
+                        break;
+                    case 'nav_status':
+                        updateNavigationStatus(data.status);
+                        break;
+                    case 'error':
+                        showError(data.message);
+                        break;
+                }
+            } catch (error) {
+                console.error('Error in handleServerMessage:', error);
+                showError('Error handling server message');
+            }
+        }
+
+        function initializeCanvas() {
+            canvasInstance = document.getElementById('mapCanvas');
+            if (!canvasInstance) {
+                console.error('Canvas element not found');
+                return;
+            }
+
+            // Set initial canvas size
+            canvasInstance.width = canvasInstance.clientWidth;
+            canvasInstance.height = canvasInstance.clientHeight;
+
+            // Calculate initial map scale if map data is available
+            if (lastMapData) {
+                const mapWidthMeters = lastMapData.width * lastMapData.resolution;
+                const mapHeightMeters = lastMapData.height * lastMapData.resolution;
+                mapScale = {
+                    x: canvasInstance.width / mapWidthMeters,
+                    y: canvasInstance.height / mapHeightMeters
+                };
+                console.log('Initial map scale:', mapScale);
+            }
+
+            updateMap();
+}
+
+
+
+        function updateSpeedDisplay(speeds) {
+            if (speeds) {
+                const speedsDiv = document.getElementById('speeds');
+                const linearSpeed = Number(speeds.linearSpeed || 0.5).toFixed(2);
+                const angularSpeed = Number(speeds.angularSpeed || 1.0).toFixed(2);
+                speedsDiv.innerHTML = `
+                    Linear: ${linearSpeed} m/s<br>
+                    Angular: ${angularSpeed} rad/s
+                `;
+            }
+        }
+
+        function updateMovementDisplay(velocities) {
+            if (velocities) {
+                const movementDiv = document.getElementById('currentMovement');
+                const linear = Number(velocities.linear || 0).toFixed(2);
+                const angular = Number(velocities.angular || 0).toFixed(2);
+                const status = (linear === '0.00' && angular === '0.00') ? 'Stopped' : 'Moving';
+                movementDiv.textContent = `Current Movement: ${status} (L: ${linear}, A: ${angular})`;
+            }
+        }
+
+
+        function updateDebugOverlay(info) {
+            const overlay = document.getElementById('debugOverlay');
+            if (overlay) {
+                overlay.innerHTML = `
+                    Map Data: ${lastMapData ? 'Received' : 'Not received'}<br>
+                    Map Size: ${lastMapData ? `${lastMapData.width}x${lastMapData.height}` : 'N/A'}<br>
+                    Resolution: ${lastMapData ? lastMapData.resolution.toFixed(3) : 'N/A'}<br>
+                    Origin: ${lastMapData ? `(${lastMapData.origin.x}, ${lastMapData.origin.y})` : 'N/A'}<br>
+                    Mouse Position: ${info.mouseX ? `(${info.mouseX.toFixed(2)}, ${info.mouseY.toFixed(2)})` : 'N/A'}<br>
+                    Robot Position: ${robotPose ? `(${robotPose.x.toFixed(2)}, ${robotPose.y.toFixed(2)})` : 'N/A'}
+                `;
+            }
+}
+
+        function updateRobotPoseDisplay() {
+            const poseDiv = document.getElementById('robotPose');
+            const x = robotPose.x.toFixed(2);
+            const y = robotPose.y.toFixed(2);
+            const theta = (robotPose.theta * 180 / Math.PI).toFixed(2);
+            poseDiv.innerHTML = `Position: (${x}, ${y})<br>Orientation: ${theta}°`;
+            
+            const robotCoordDiv = document.getElementById('robotCoordinates');
+            robotCoordDiv.textContent = `Robot: (${x}, ${y})`;
+        }
+
+        function updateNavigationStatus(status) {
+            const navStatusDiv = document.getElementById('navStatus');
+            navStatusDiv.textContent = `Navigation Status: ${status}`;
+        }
+
+        function updateMap() {
+            // Get canvas and initialize with safety checks
+            canvasInstance = document.getElementById('mapCanvas');
+            if (!canvasInstance) {
+                console.error('Canvas element not found!');
+                return;
+            }
+
+            const ctx = canvasInstance.getContext('2d');
+            if (!ctx) {
+                console.error('Could not get canvas context');
+                return;
+            }
+
+            // Initialize canvas size if not already set
+            if (canvasInstance.width === 0 || canvasInstance.height === 0) {
+                canvasInstance.width = canvasInstance.clientWidth;
+                canvasInstance.height = canvasInstance.clientHeight;
+                
+                if (lastMapData) {
+                    // Calculate map scale when canvas is initialized
+                    const mapWidthMeters = lastMapData.width * lastMapData.resolution;
+                    const mapHeightMeters = lastMapData.height * lastMapData.resolution;
+                    mapScale = {
+                        x: canvasInstance.width / mapWidthMeters,
+                        y: canvasInstance.height / mapHeightMeters
+                    };
+                    console.log('Map scale initialized:', mapScale);
+                }
+            }
+
+            // Set canvas size to match container
+            canvasInstance.width = canvasInstance.clientWidth;
+            canvasInstance.height = canvasInstance.clientHeight;
+
+            // Clear canvas
+            ctx.clearRect(0, 0, canvasInstance.width, canvasInstance.height);
+
+            // Draw map boundaries and axes
+            if (lastMapData) {
+                // Draw map frame
+                ctx.strokeStyle = 'rgba(0, 0, 255, 0.5)';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(0, 0, canvasInstance.width, canvasInstance.height);
+
+                // Draw coordinate axes
+                const centerX = canvasInstance.width / 2;
+                const centerY = canvasInstance.height / 2;
+                
+                // X-axis (red)
+                ctx.beginPath();
+                ctx.moveTo(centerX, centerY);
+                ctx.lineTo(centerX + 50, centerY);
+                ctx.strokeStyle = 'red';
+                ctx.stroke();
+                
+                // Y-axis (green)
+                ctx.beginPath();
+                ctx.moveTo(centerX, centerY);
+                ctx.lineTo(centerX, centerY - 50);
+                ctx.strokeStyle = 'green';
+                ctx.stroke();
+                
+                ctx.lineWidth = 1;
+            }
+
+            // Draw grid
+            const gridSize = lastMapData ? (lastMapData.resolution * mapScale.x) : 50; // Grid size in pixels
+            ctx.strokeStyle = 'rgba(200, 200, 200, 0.5)';
+            ctx.beginPath();
+            
+            // Vertical lines
+            for (let x = 0; x <= canvasInstance.width; x += gridSize) {
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvasInstance.height);
+            }
+            
+            // Horizontal lines
+            for (let y = 0; y <= canvasInstance.height; y += gridSize) {
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvasInstance.width, y);
+            }
+            ctx.stroke();
+
+            // Draw map if available
+            if (lastMapData && lastMapData.data) {
+                drawStaticMap(ctx, lastMapData);
+            }
+
+            // Draw LIDAR data
+            if (lastScanData) {
+                drawLidarScan(ctx, lastScanData);
+            }
+
+            // Draw robot position
+            const centerX = canvasInstance.width / 2;
+            const centerY = canvasInstance.height / 2;
+
+            // Draw robot base
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, 10, 0, Math.PI * 2);
+            ctx.fillStyle = 'blue';
+            ctx.fill();
+            ctx.strokeStyle = 'darkblue';
+            ctx.stroke();
+
+            // Draw robot orientation
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            const robotLineLength = 20;
+            ctx.lineTo(
+                centerX + Math.cos(robotPose.theta) * robotLineLength,
+                centerY - Math.sin(robotPose.theta) * robotLineLength
+            );
+            ctx.strokeStyle = 'yellow';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.lineWidth = 1;
+
+            // Draw goal position if setting goal
+            if (isSettingGoal && startX && startY) {
+                ctx.beginPath();
+                ctx.arc(startX, startY, 5, 0, Math.PI * 2);
+                ctx.fillStyle = 'green';
+                ctx.fill();
+                ctx.strokeStyle = 'darkgreen';
+                ctx.stroke();
+
+                if (isDragging) {
+                    // Draw orientation arrow
+                    const arrowLength = 20;
+                    ctx.beginPath();
+                    ctx.moveTo(startX, startY);
+                    ctx.lineTo(
+                        startX + Math.cos(currentTheta) * arrowLength,
+                        startY - Math.sin(currentTheta) * arrowLength
+                    );
+                    ctx.strokeStyle = 'green';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+
+                    // Draw arrowhead
+                    const arrowSize = 5;
+                    const angle = Math.PI / 6;
+                    const endX = startX + Math.cos(currentTheta) * arrowLength;
+                    const endY = startY - Math.sin(currentTheta) * arrowLength;
+                    ctx.beginPath();
+                    ctx.moveTo(endX, endY);
+                    ctx.lineTo(
+                        endX - arrowSize * Math.cos(currentTheta - angle),
+                        endY + arrowSize * Math.sin(currentTheta - angle)
+                    );
+                    ctx.moveTo(endX, endY);
+                    ctx.lineTo(
+                        endX - arrowSize * Math.cos(currentTheta + angle),
+                        endY + arrowSize * Math.sin(currentTheta + angle)
+                    );
+                    ctx.stroke();
+                    ctx.lineWidth = 1;
+                }
+            }
+
+            // Draw initial pose if setting pose
+            if (isSettingPose && startX && startY) {
+                ctx.beginPath();
+                ctx.arc(startX, startY, 5, 0, Math.PI * 2);
+                ctx.fillStyle = 'blue';
+                ctx.fill();
+                ctx.strokeStyle = 'darkblue';
+                ctx.stroke();
+
+                if (isDragging) {
+                    // Draw orientation arrow
+                    const arrowLength = 20;
+                    ctx.beginPath();
+                    ctx.moveTo(startX, startY);
+                    ctx.lineTo(
+                        startX + Math.cos(currentTheta) * arrowLength,
+                        startY - Math.sin(currentTheta) * arrowLength
+                    );
+                    ctx.strokeStyle = 'blue';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+
+                    // Draw arrowhead
+                    const arrowSize = 5;
+                    const angle = Math.PI / 6;
+                    const endX = startX + Math.cos(currentTheta) * arrowLength;
+                    const endY = startY - Math.sin(currentTheta) * arrowLength;
+                    ctx.beginPath();
+                    ctx.moveTo(endX, endY);
+                    ctx.lineTo(
+                        endX - arrowSize * Math.cos(currentTheta - angle),
+                        endY + arrowSize * Math.sin(currentTheta - angle)
+                    );
+                    ctx.moveTo(endX, endY);
+                    ctx.lineTo(
+                        endX - arrowSize * Math.cos(currentTheta + angle),
+                        endY + arrowSize * Math.sin(currentTheta + angle)
+                    );
+                    ctx.stroke();
+                    ctx.lineWidth = 1;
+                }
+            }
+
+            // Update coordinates overlay
+            if (lastMapData) {
+                const centerCoords = canvasToMapCoordinates(centerX, centerY);
+                document.getElementById('robotCoordinates').textContent = 
+                    `Robot: (${centerCoords.x.toFixed(2)}, ${centerCoords.y.toFixed(2)})`;
+            }
+                }
+        function drawGrid(ctx) {
+            const gridSize = 1.0; // 1 meter grid
+            const pixelsPerMeter = canvasInstance.width / (lastMapData ? lastMapData.width * lastMapData.resolution : 20);
+            
+            ctx.strokeStyle = 'rgba(200, 200, 200, 0.5)';
+            ctx.beginPath();
+
+            // Draw vertical lines
+            for (let x = 0; x <= canvasInstance.width; x += gridSize * pixelsPerMeter) {
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvasInstance.height);
+            }
+
+            // Draw horizontal lines
+            for (let y = 0; y <= canvasInstance.height; y += gridSize * pixelsPerMeter) {
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvasInstance.width, y);
+            }
+
+            ctx.stroke();
+
+        }
+
+        function drawStaticMap(ctx, mapData) {
+            if (!mapData || !mapData.data) return;
+
+            const imageData = ctx.createImageData(mapData.width, mapData.height);
+            for (let i = 0; i < mapData.data.length; i++) {
+                const value = mapData.data[i];
+                const idx = i * 4;
+                
+                if (value === -1) { // Unknown
+                    imageData.data[idx] = 204;     // R
+                    imageData.data[idx + 1] = 204; // G
+                    imageData.data[idx + 2] = 204; // B
+                    imageData.data[idx + 3] = 255; // A
+                } else if (value === 0) { // Free space
+                    imageData.data[idx] = 255;     // R
+                    imageData.data[idx + 1] = 255; // G
+                    imageData.data[idx + 2] = 255; // B
+                    imageData.data[idx + 3] = 255; // A
+                } else { // Obstacle
+                    imageData.data[idx] = 0;       // R
+                    imageData.data[idx + 1] = 0;   // G
+                    imageData.data[idx + 2] = 0;   // B
+                    imageData.data[idx + 3] = 255; // A
+                }
+            }
+            
+            // Scale map to fit canvas
+            const scaleX = canvasInstance.width / mapData.width;
+            const scaleY = canvasInstance.height / mapData.height;
+            const scale = Math.min(scaleX, scaleY);
+            
+            // Create temporary canvas for scaling
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = mapData.width;
+            tempCanvas.height = mapData.height;
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCtx.putImageData(imageData, 0, 0);
+            
+            // Draw scaled map
+            ctx.save();
+            ctx.scale(scale, scale);
+            ctx.drawImage(tempCanvas, 0, 0);
+            ctx.restore();
+        }
+
+        function drawLidarScan(ctx, scanData) {
+            if (!scanData || !scanData.ranges) return;
+
+            const scale = 50; // Scale factor for visualization
+            ctx.save();
+            ctx.translate(canvasInstance.width / 2, canvasInstance.height / 2);
+            ctx.fillStyle = 'rgba(255, 0, 0, 0.3)';
+
+            for (let i = 0; i < scanData.ranges.length; i++) {
+                const range = scanData.ranges[i];
+                if (range >= scanData.range_min && range <= scanData.range_max) {
+                    const angle = scanData.angle_min + (i * scanData.angle_increment);
+                    const x = range * Math.cos(angle) * scale;
+                    const y = -range * Math.sin(angle) * scale;
+                    
+                    ctx.beginPath();
+                    ctx.arc(x, y, 2, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+            ctx.restore();
+        }
+
+        function drawRobot(ctx) {
+            const centerX = canvasInstance.width / 2;
+            const centerY = canvasInstance.height / 2;
+
+            // Draw robot base
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, 10, 0, Math.PI * 2);
+            ctx.fillStyle = 'blue';
+            ctx.fill();
+            ctx.strokeStyle = 'darkblue';
+            ctx.stroke();
+
+            // Draw orientation line
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            const lineLength = 20;
+            ctx.lineTo(
+                centerX + Math.cos(robotPose.theta) * lineLength,
+                centerY - Math.sin(robotPose.theta) * lineLength
+            );
+            ctx.strokeStyle = 'yellow';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.lineWidth = 1;
+        }
+
+        function drawOrientationLine(ctx) {
+            if (!startX || !startY || !currentTheta) return;
+    
+            // Draw start point
+            ctx.beginPath();
+            ctx.arc(startX, startY, 5, 0, Math.PI * 2);
+            ctx.fillStyle = isSettingPose ? 'blue' : 'green';
+            ctx.fill();
+            
+            // Draw orientation line
+            ctx.beginPath();
+            ctx.moveTo(startX, startY);
+            const lineLength = 40;
+            const endX = startX + Math.cos(currentTheta) * lineLength;
+            const endY = startY - Math.sin(currentTheta) * lineLength;
+            ctx.lineTo(endX, endY);
+            ctx.strokeStyle = isSettingPose ? 'blue' : 'green';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            // Draw arrowhead
+            ctx.beginPath();
+            const arrowSize = 10;
+            const angle = Math.PI / 6;
+            ctx.moveTo(endX, endY);
+            ctx.lineTo(
+                endX - arrowSize * Math.cos(currentTheta - angle),
+                endY + arrowSize * Math.sin(currentTheta - angle)
+            );
+            ctx.moveTo(endX, endY);
+            ctx.lineTo(
+                endX - arrowSize * Math.cos(currentTheta + angle),
+                endY + arrowSize * Math.sin(currentTheta + angle)
+            );
+            ctx.stroke();
+        }
+
+        function mapToCanvasCoordinates(x, y) {
+            if (!lastMapData) return { x: 0, y: 0 };
+            const resolution = lastMapData.resolution;
+            return {
+                x: ((x - lastMapData.origin.x) / resolution) * mapScale.x + canvasInstance.width / 2,
+                y: canvasInstance.height / 2 - ((y - lastMapData.origin.y) / resolution) * mapScale.y
+            };
+        }
+
+        function canvasToMapCoordinates(canvasX, canvasY) {
+            if (!canvasInstance) {
+                console.warn('Canvas not initialized');
+                return { x: 0, y: 0 };
+            }
+            if (!lastMapData) {
+                console.warn('No map data available');
+                return { x: 0, y: 0 };
+            }
+
+            // Get canvas dimensions
+            const canvasWidth = canvasInstance.width;
+            const canvasHeight = canvasInstance.height;
+
+            // Calculate map dimensions in meters
+            const mapWidthMeters = lastMapData.width * lastMapData.resolution;
+            const mapHeightMeters = lastMapData.height * lastMapData.resolution;
+            
+            // Convert canvas coordinates to map coordinates
+            const mapX = ((canvasX / canvasWidth) * mapWidthMeters) + lastMapData.origin.x;
+            const mapY = (((canvasHeight - canvasY) / canvasHeight) * mapHeightMeters) + lastMapData.origin.y;
+
+            console.log('Converting coordinates:', {
+                canvas: { x: canvasX, y: canvasY },
+                map: { x: mapX, y: mapY }
+            });
+
+            return { x: mapX, y: mapY };
+              }
+
+        function initializeCanvasEvents() {
+            const canvas = document.getElementById('mapCanvas');
+            if (!canvas) return;
+
+            canvas.addEventListener('mousemove', (event) => {
+                const rect = canvas.getBoundingClientRect();
+                const x = event.clientX - rect.left;
+                const y = event.clientY - rect.top;
+                const mapCoords = canvasToMapCoordinates(x, y);
+                
+                updateDebugOverlay({
+                    mouseX: mapCoords.x,
+                    mouseY: mapCoords.y
+                });
+
+                if (isDragging && (isSettingPose || isSettingGoal)) {
+                    currentTheta = Math.atan2(-(y - startY), x - startX);
+                    updateMap();
+                }
+            });
+
+            canvas.addEventListener('mousedown', (event) => {
+                if (isSettingPose || isSettingGoal) {
+                    isDragging = true;
+                    const rect = canvas.getBoundingClientRect();
+                    startX = event.clientX - rect.left;
+                    startY = event.clientY - rect.top;
+                    
+                    // Log the click position
+                    console.log('Mouse down at:', {startX, startY});
+                    const mapCoords = canvasToMapCoordinates(startX, startY);
+                    console.log('Converted to map coordinates:', mapCoords);
+                    
+                    updateMap();
+                }
+            });
+
+            canvas.addEventListener('mouseup', (event) => {
+                if (isDragging) {
+                    const rect = canvas.getBoundingClientRect();
+                    const endX = event.clientX - rect.left;
+                    const endY = event.clientY - rect.top;
+                    currentTheta = Math.atan2(-(endY - startY), endX - startX);
+                    
+                    const mapCoords = canvasToMapCoordinates(startX, startY);
+                    console.log('Sending coordinates to server:', {
+                        x: mapCoords.x,
+                        y: mapCoords.y,
+                        theta: currentTheta
+                    });
+
+                    if (isSettingPose) {
+                        sendWSMessage({
+                            type: 'set_initial_pose',
+                            x: mapCoords.x,
+                            y: mapCoords.y,
+                            theta: currentTheta
+                        });
+                    } else if (isSettingGoal) {
+                        sendWSMessage({
+                            type: 'set_nav_goal',
+                            x: mapCoords.x,
+                            y: mapCoords.y,
+                            theta: currentTheta
+                        });
+                    }
+
+                    isDragging = false;
+                    isSettingPose = false;
+                    isSettingGoal = false;
+                    document.getElementById('setPoseBtn').classList.remove('active');
+                    document.getElementById('setGoalBtn').classList.remove('active');
+                    updateMap();
+    }
+                });
+
+            canvas.addEventListener('mouseleave', () => {
+                if (isDragging) {
+                    isDragging = false;
+                    isSettingPose = false;
+                    isSettingGoal = false;
+                    document.getElementById('setPoseBtn').classList.remove('active');
+                    document.getElementById('setGoalBtn').classList.remove('active');
+                    canvas.style.cursor = 'crosshair';
+                    updateMap();
+                }
+            });
+        }
+
+        function initializeButtons() {
+            const setPoseBtn = document.getElementById('setPoseBtn');
+            const setGoalBtn = document.getElementById('setGoalBtn');
+            const cancelNavBtn = document.getElementById('cancelNavBtn');
+
+            setPoseBtn.onclick = function() {
+                isSettingPose = !isSettingPose;
+                isSettingGoal = false;
+                this.classList.toggle('active');
+                setGoalBtn.classList.remove('active');
+                canvasInstance.style.cursor = isSettingPose ? 'crosshair' : 'default';
+            };
+
+            setGoalBtn.onclick = function() {
+                isSettingGoal = !isSettingGoal;
+                isSettingPose = false;
+                this.classList.toggle('active');
+                setPoseBtn.classList.remove('active');
+                canvasInstance.style.cursor = isSettingGoal ? 'crosshair' : 'default';
+            };
+
+            cancelNavBtn.onclick = function() {
+                ws.send(JSON.stringify({ type: 'cancel_navigation' }));
+            };
+
+            // Initialize movement control buttons
+            document.querySelectorAll('.control-button, .speed-button').forEach(button => {
+                button.addEventListener('click', () => {
+                    const key = button.getAttribute('data-key');
+                    sendCommand(key);
+                });
+            });
+        }
+
+        function sendCommand(key) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'keyCommand',
+                    key: key
+                }));
+            }
+        }
+
+        // Keyboard event handlers
+        document.addEventListener('keydown', (event) => {
+            const key = event.key.toLowerCase();
+            if ('uiojklm,.qwexzc'.includes(key)) {
+                event.preventDefault();
+                sendCommand(key);
+            }
+        });
+
+        document.addEventListener('keyup', (event) => {
+            const key = event.key.toLowerCase();
+            if ('uiojklm,.'.includes(key)) {
+                sendCommand('k'); // Stop on key release
+            }
+        });
+
+        // Initialize everything when the page loads
+        window.onload = function() {
+            console.log('Window loaded, initializing...');
+            initializeCanvas();
+            connect();
+            initializeCanvasEvents();
+            initializeButtons();
+        };
+    </script>
+</body>
+</html>
